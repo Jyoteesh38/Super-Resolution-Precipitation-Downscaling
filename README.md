@@ -11,6 +11,7 @@ This project applies Super-Resolution Deconvolutional Neural Networks with step 
   - Training set: 286,720 samples
   - Test set: 72,704 samples
 - **Scalable distributed training across 80 GPUs** on the Gadi supercomputer (NCI Australia)
+This setup enables rapid and efficient training of deep learning models on large-scale high-resolution climate data.
 
 ## Example Output
 
@@ -18,7 +19,6 @@ The figure below compares test period climatology of coarse-resolution input (10
 
 ![Example of downscaling performance](images/test_period_climatology.jpg)
 
-This setup enables rapid and efficient training of deep learning models on large-scale high-resolution climate data.
 ## Publication
 This work is published in the journal *Environmental Data Science*:
 **A precipitation downscaling method using a super-resolution deconvolution neural network with step orography**  
