@@ -15,7 +15,7 @@ This setup enables rapid and efficient training of deep learning models on large
 
 ## Example Output
 
-The figure below compares test period climatology of coarse-resolution input (100 km), high-resolution ground truth (12.5 km), and machine learning-based downscaled precipitation (12.5 km) over Australia and Papua New Guinea:
+The figure below compares test period climatology of coarse-resolution input (100 km) (a, d), high-resolution ground truth (12.5 km) (b, e), and machine learning-based downscaled precipitation (12.5 km) (c, f) over Australia and Papua New Guinea:
 
 ![Example of downscaling performance](images/test_period_climatology.jpg)
 
