@@ -9,7 +9,6 @@ import tensorflow as tf
 import numpy as np
 import sys
 import xarray as xr
-
 import horovod.tensorflow.keras as hvd
 import time
 import socket
