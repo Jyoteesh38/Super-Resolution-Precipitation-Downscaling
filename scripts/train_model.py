@@ -3,7 +3,6 @@ import tensorflow as tf
 import pickle, yaml, os
 from models.SRDN_SO import build_srdcnn_step_orography
 from models.utils import normalize_orography, load_precipitation, match_orography
-
 #----------------------------------------------------------------------------------------------
 # Horovod: initialize Horovod.
 #----------------------------------------------------------------------------------------------
@@ -22,43 +21,97 @@ for gpu in gpus:
 if gpus:
     tf.config.experimental.set_visible_devices(gpus[hvd.local_rank()], 'GPU')
 #----------------------------------------------------------------------------------------------
-pq = normalize_orography('oro.nc')
+# Set total number of images, training epoch size, test data size
+#
+#  - must be Scalable/divisible to multi nodes to ensure load balance
 
-Total = 359424
+# 41 years of data 1980-2020📍️
+
+Total_images = 359424
 Epoch_size = 286720
-Test_size = Total - Epoch_size
-istart = int(hvd.rank()*Epoch_size/hvd.size())
-istop = int((hvd.rank()+1)*Epoch_size/hvd.size())
-i_test_start = int(hvd.rank()*Test_size/hvd.size()+Epoch_size) + 1
-i_test_stop = min(int((hvd.rank()+1)*Test_size/hvd.size()+Epoch_size), Total - 1)
+Test_size  = Total_images - Epoch_size
 
-y_train, x_train = load_precipitation('precip', shrink = 8, istart, istop)
-y_test, x_test = load_precipitation('precip', shrink = 8, i_test_start, i_test_stop)
+# Batch size - aim to fill GPU memory to achieve best computational performance
+batch_size = 16
+#----------------------------------------------------------------------------------------------
+# Horovod: Split the test data across multiple processors   
+#----------------------------------------------------------------------------------------------
+istart = int(hvd.rank()*Epoch_size/hvd.size())
+istop  = int((hvd.rank()+1)*Epoch_size/hvd.size())
+
+i_test_start = int(hvd.rank()*Test_size/hvd.size()+Epoch_size) + 1
+i_test_stop  = int((hvd.rank()+1)*Test_size/hvd.size()+Epoch_size)
+
+if i_test_stop >= Total_images:
+  i_test_stop = Total_images - 1
+
+print ( '*** rank = ', hvd.rank(),' istart = ', istart, ' istop = ', istop)
+print ( '*** rank = ', hvd.rank(),' i_test_start = ', i_test_start, ' i_test_stop = ', i_test_stop)
+#----------------------------------------------------------------------------------------------
+# Set key parameters
+#----------------------------------------------------------------------------------------------
+numHiddenUnits = 64
+numResponses = 1
+numFeatures  = 1
+shrink = 8
+numLats = 512 
+numLongs = 512
+#----------------------------------------------------------------------------------------------
+# Data loading
+#----------------------------------------------------------------------------------------------
+pq = normalize_orography('oro.nc')
+y_train, x_train = load_precipitation('precip', shrink, istart, istop)
+y_test, x_test = load_precipitation('precip', shrink, i_test_start, i_test_stop)
 p_train = match_orography(pq, x_train.shape[0])
 p_test = match_orography(pq, x_test.shape[0])
-
-model = build_srdcnn_step_orography(params['hidden_units'], params['responses'], params['features'],
-                                     params['lats'], params['longs'], params['shrink'],
-                                     train_cfg['learning_rate'], horovod_opt=hvd.DistributedOptimizer)
-
+#----------------------------------------------------------------------------------------------
+# Horovod: create callbacks required for horovod model run
+#----------------------------------------------------------------------------------------------
 callbacks = [
+    # Horovod: broadcast initial variable states from rank 0 to all other processes.
+    # This is necessary to ensure consistent initialization of all workers when
+    # training is started with random weights or restored from a checkpoint.
     hvd.callbacks.BroadcastGlobalVariablesCallback(0),
+
+    # Horovod: average metrics among workers at the end of every epoch.
+    # Note: This callback must be in the list before the ReduceLROnPlateau,
+    # TensorBoard or other metrics-based callbacks.
     hvd.callbacks.MetricAverageCallback(),
+
+    # Horovod: using `lr = 1.0 * hvd.size()` from the very beginning leads to worse final
+    # accuracy. Scale the learning rate `lr = 1.0` ---> `lr = 1.0 * hvd.size()` during
+    # the first five epochs. See https://arxiv.org/abs/1706.02677 for details.
     hvd.callbacks.LearningRateWarmupCallback(warmup_epochs=5, verbose=1),
-    tf.keras.callbacks.ReduceLROnPlateau(factor=0.1, patience=10, min_lr=1e-5)
+
+    # Reduce the learning rate if training plateaues.
+    tf.keras.callbacks.ReduceLROnPlateau(factor=0.1, monitor='val_loss', mode='min', patience=10, min_lr=0.00001, verbose=1),
+#    dropout_scheduler
+    # LMS(swapout_threshold=1, swapin_groupby=0, swapin_ahead=1), # These are the max swapping, slowest data throughput parameters. Adding sync_mode=3 would also allow for higher amount of data.
 ]
-
+#----------------------------------------------------------------------------------------------
+# Horovod: save checkpoints only on worker 0 to prevent other workers from corrupting them.
+#----------------------------------------------------------------------------------------------
 if hvd.rank() == 0:
-    os.makedirs(data_cfg['model_dir'], exist_ok=True)
-    callbacks.append(tf.keras.callbacks.ModelCheckpoint(os.path.join(data_cfg['model_dir'], 'checkpoint-{epoch}.h5'),
-                                                        monitor='val_loss', save_best_only=True))
-
-history = model.fit([x_train, p_train], y_train,
-                    validation_data=([x_test, p_test], y_test),
-                    batch_size=train_cfg['batch_size'],
-                    epochs=train_cfg['epochs'], callbacks=callbacks, verbose=2)
-
+    callbacks.append(tf.keras.callbacks.ModelCheckpoint('./checkpoint-{epoch}.h5', monitor='val_loss', save_best_only=True))
+#----------------------------------------------------------------------------------------------
+# 	Build the model
+#----------------------------------------------------------------------------------------------
+model = SRDCNN_STEP_ORO(numHiddenUnits, numResponses, numFeatures, numLats, numLongs, shrink)
+#----------------------------------------------------------------------------------------------
+# 	Train the model
+#----------------------------------------------------------------------------------------------
+# Setup timer for training step
+t0[hvd.rank()] = time.time()
+# Add a barrier to sync all processes before starting training
+hvd.allreduce([0], name="Barrier")
+print ('*** rank = ', hvd.rank(),' Train model')
+history = model.fit([x_train, p_train], y_train, callbacks=callbacks, epochs=100, verbose=2, 
+                      validation_data = ([x_test, p_test], y_test)) 
+# Elapsed time for training operation
+elapsed_time = time.time() - t0[hvd.rank()]
+print ('*** rank = ', hvd.rank(),' Total Training Elapsed Time (sec) = ', elapsed_time)
+#for history in histories:
+with open('./trainHistoryDict_{}_GPU'.format(hvd.size()), 'wb') as file_pi:
+    pickle.dump(history.history, file_pi)
 if hvd.rank() == 0:
-    model.save(os.path.join(data_cfg['model_dir'], 'SRDCNN_STEP_ORO.h5'))
-    with open(os.path.join(data_cfg['output_dir'], 'trainHistoryDict.pkl'), 'wb') as f:
-        pickle.dump(history.history, f)
+   model.save('./SRDCNN_STEP_ORO.h5')
