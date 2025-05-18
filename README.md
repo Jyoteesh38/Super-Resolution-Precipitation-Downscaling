@@ -10,7 +10,7 @@ This project applies Super-Resolution Deconvolutional Neural Networks with step 
   - Total images: 359,424
   - Training set: 286,720 samples
   - Test set: 72,704 samples
-- **Scalable distributed training across 80 GPUs** on the Gadi supercomputer (NCI Australia)
+- **Scalable distributed training across 80 NVIDIA V100 GPUs** on the Gadi supercomputer (NCI Australia)
 This setup enables rapid and efficient training of deep learning models on large-scale high-resolution climate data.
 
 ## Example Output
