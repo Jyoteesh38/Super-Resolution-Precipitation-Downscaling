@@ -1,5 +1,5 @@
 # Super-Resolution-Precipitation-Downscaling
-This project applies Super-Resolution Deconvolutional Neural Networks with step orography (SRDN-SO) to downscale hourly precipitation from 100 km to 12.5 km over Australia.
+This project applies Super-Resolution Deconvolutional Neural Networks with step orography (SRDN-SO) to downscale hourly precipitation from 100 km to 12.5 km horizontal resolution over Australia.
 
 ## Key Features
 - 8× spatial resolution enhancement
