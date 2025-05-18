@@ -5,7 +5,6 @@ import horovod.tensorflow.keras as hvd
 def SRDN_STEP_ORO(numHiddenUnits, numResponses, numFeatures, numLats, numLongs, shrink):
     """
     Builds a super-resolution downscaling CNN model using Conv2DTranspose layers with Orography input.
-
     Parameters:
     - numHiddenUnits: Number of filters in hidden conv layers.
     - numResponses: Number of output channels.
@@ -13,7 +12,6 @@ def SRDN_STEP_ORO(numHiddenUnits, numResponses, numFeatures, numLats, numLongs, 
     - numLats: Latitude dimension of high-res data.
     - numLongs: Longitude dimension of high-res data.
     - shrink: Downsampling factor for inputs.
-
     Returns:
     - A compiled Keras model with Horovod distributed optimizer.
     """
