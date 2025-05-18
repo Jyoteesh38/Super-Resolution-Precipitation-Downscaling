@@ -1,7 +1,7 @@
 import horovod.tensorflow.keras as hvd
 import tensorflow as tf
 import pickle, yaml, os
-from models.SRDCNN import build_srdcnn_step_orography
+from models.SRDN-SO import build_srdcnn_step_orography
 from models.utils import normalize_orography, load_precipitation, match_orography
 
 #----------------------------------------------------------------------------------------------
