@@ -3,7 +3,6 @@ import random
 os.environ["TF_DISABLE_NVTX_RANGES"] = "1"
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 os.environ["NCCL_DEBUG"] = "WARN"
-
 import time
 import tensorflow as tf
 import numpy as np
