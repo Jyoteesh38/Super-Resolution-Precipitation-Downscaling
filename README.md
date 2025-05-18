@@ -17,3 +17,12 @@ This setup enables rapid and efficient training of deep learning models on large
 This work is published in the journal *Environmental Data Science*:
 **A precipitation downscaling method using a super-resolution deconvolution neural network with step orography**  
 DOI: [10.1017/eds.2023.18](https://doi.org/10.1017/eds.2023.18)
+## Scripts Overview
+**SRDN_SO.py**: Defines the SRDCNN_STEP_ORO model architecture with progressive deconvolution and orography fusion.
+Returns a compiled Keras model optimized for Horovod-based distributed training.
+**utils.py**: Contains helper functions to normalize orography, load precipitation data, and align input shapes.
+Used for preprocessing inputs for both training and evaluation phases.
+**train_model.py**: Trains the SRDCNN_STEP_ORO model using Horovod for distributed GPU training on precipitation data.
+Handles data loading, preprocessing, training callbacks, and model checkpointing.
+**model_predictions.py**: Runs inference using multiple deep learning models on downscaled precipitation data with orography.
+Evaluates performance using PSNR, SSIM, MSE, and frequency spectrum, and saves outputs as NetCDF.
